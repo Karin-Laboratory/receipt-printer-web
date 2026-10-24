@@ -110,7 +110,7 @@ class GatewayIntegration(unittest.TestCase):
         cls.root = pathlib.Path(cls.tmp.name)
         cls.capture = cls.root / "capture"
         cls.capture.mkdir(mode=0o700)
-        cls.proc = subprocess.Popen([str(ROOT / "build/gateway"), "--port", str(cls.port), "--capture-dir", str(cls.capture)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        cls.proc = subprocess.Popen(["python3", str(ROOT / "scripts/strict_ipp_proxy.py"), "--port", str(cls.port), "--capture-dir", str(cls.capture)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         wait_for(lambda: subprocess.run(["ipptool", "-t", f"ipp://127.0.0.1:{cls.port}/ipp/print", "/usr/share/cups/ipptool/get-printer-attributes.test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
         cls.raster = cls.root / "fixture.pwg"
         subprocess.run([str(ROOT / "build/raster-fixture"), str(cls.raster), "10"], check=True)
@@ -130,9 +130,11 @@ class GatewayIntegration(unittest.TestCase):
         output = (set(self.capture.glob("job-*.escpos")) - before).pop().read_bytes()
         pages, cuts = parse_escpos(output)
         self.assertEqual((len(pages), cuts), (10, 1))
-        self.assertTrue(all(len(page) >= 64 * 3 and len(page) % 64 == 0 for page in pages))
+        self.assertTrue(all(len(page) == 64 * 3 for page in pages), "PWG page height must be exactly 3 rows")
         # The unique marker bit moves right one dot per page, proving input order is kept.
-        self.assertEqual([page[0] for page in pages], [0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0, 0])
+        for i, page in enumerate(pages):
+            x = 27 + i
+            self.assertTrue(page[x // 8] & (0x80 >> (x % 8)), f"missing original PWG marker on page {i}")
 
     def test_pdf_single_two_ten_page_documents(self):
         for count in (1, 2, 10):
@@ -177,7 +179,7 @@ class GatewayIntegration(unittest.TestCase):
         self.assertEqual(set(self.capture.glob("job-*.escpos")), before)
         self.assertEqual(list(self.capture.glob("*.partial")), [])
 
-    def test_z_pappl_unsupported_media_behavior_is_documented(self):
+    def test_z_unsupported_media_rejected_before_pappl(self):
         path = self.root / "media-check.pdf"; make_pdf(path, 1)
         result = subprocess.run([
             "ipptool", "-t", "-f", str(path), "-d", "filetype=application/pdf",
@@ -185,8 +187,10 @@ class GatewayIntegration(unittest.TestCase):
             str(ROOT / "tests/ipp-invalid-media.test")], capture_output=True, text=True, timeout=10)
         # PAPPL 1.3.1 currently substitutes its default media instead of enforcing
         # ipp-attribute-fidelity. This test records that known compatibility gap.
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("successful-ok-ignored-or-substituted-attributes", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("client-error-attributes-or-values-not-supported", result.stdout)
+        # Ingress rejection must not create a capture file.
+        self.assertEqual(set(self.capture.glob("*.partial")), set())
 
     def test_events_record_one_terminal_cut_per_completed_document(self):
         events = [json.loads(line) for line in (self.capture / "events.jsonl").read_text().splitlines()]
