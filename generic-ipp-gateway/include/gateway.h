@@ -9,7 +9,7 @@
 
 #define GW_WIDTH_DOTS 512
 #define GW_MAX_JOB_BYTES (64u * 1024u * 1024u)
-#define GW_MAX_PAGE_HEIGHT 200000
+#define GW_MAX_PAGE_HEIGHT 65535
 
 typedef struct {
   int fd;
@@ -38,6 +38,7 @@ bool gw_escpos_row(const unsigned char *line, unsigned width, unsigned row);
 bool gw_escpos_page_end(void);
 bool gw_escpos_cut(void);
 bool gw_driver(pappl_system_t *, const char *, const char *, const char *, pappl_pr_driver_data_t *, ipp_t **, void *);
+bool gw_pwg_render_original(pappl_job_t *job);
 bool gw_pdf_filter(pappl_job_t *, pappl_device_t *, void *);
 void gw_abort_current_job(pappl_job_t *job);
 
