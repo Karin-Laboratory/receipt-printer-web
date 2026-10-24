@@ -31,7 +31,7 @@ $(BUILD)/gateway-test: $(SOURCES) include/gateway.h | $(BUILD)
 $(BUILD)/raster-fixture: tests/raster_fixture.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< -o $@ $(shell $(PKG_CONFIG) --libs pappl)
 
-test: check-deps $(BUILD)/gateway $(BUILD)/gateway-test $(BUILD)/raster-fixture
+test: check-deps $(BUILD)/gateway $(BUILD)/gateway-test $(BUILD)/raster-fixture $(BUILD)/pwg2pdf
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
 
 analyze: check-deps | $(BUILD)
