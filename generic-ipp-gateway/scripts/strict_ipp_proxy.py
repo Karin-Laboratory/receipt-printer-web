@@ -83,19 +83,44 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/ipp/print" or self.headers.get_content_type() != "application/ipp":
             self.respond(404, b"", "text/plain")
             return
-        if "Transfer-Encoding" in self.headers:
-            self.respond(400, b"", "text/plain")  # No chunked bypass.
-            return
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            length = 0
-        if not (8 <= length <= MAX_BODY):
-            self.respond(413, b"", "text/plain")
-            return
         self.connection.settimeout(70)
-        data = self.rfile.read(length)
-        if len(data) != length:
+        try:
+            encoding = self.headers.get("Transfer-Encoding", "").strip().lower()
+            if encoding:
+                if encoding != "chunked" or "Content-Length" in self.headers:
+                    raise ValueError("ambiguous HTTP framing")
+                chunks, total = [], 0
+                while True:
+                    header = self.rfile.readline(96)
+                    if not header.endswith(b"\\r\\n") or not header:
+                        raise ValueError("bad chunk framing")
+                    # Reject extensions to prevent request-smuggling ambiguity.
+                    sizeword = header[:-2]
+                    if not sizeword or any(v not in b"0123456789abcdefABCDEF" for v in sizeword):
+                        raise ValueError("bad chunk size")
+                    size = int(sizeword, 16)
+                    if size > MAX_BODY - total:
+                        raise ValueError("IPP document too large")
+                    if size == 0:
+                        if self.rfile.read(2) != b"\\r\\n":
+                            raise ValueError("unsupported HTTP trailers")
+                        break
+                    part = self.rfile.read(size)
+                    if len(part) != size or self.rfile.read(2) != b"\\r\\n":
+                        raise ValueError("short HTTP chunk")
+                    chunks.append(part)
+                    total += size
+                data = b"".join(chunks)
+            else:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not (8 <= length <= MAX_BODY):
+                    raise ValueError("invalid document length")
+                data = self.rfile.read(length)
+                if len(data) != length:
+                    raise ValueError("short HTTP body")
+            if len(data) < 8:
+                raise ValueError("truncated IPP header")
+        except (ValueError, OSError):
             self.respond(400, b"", "text/plain")
             return
         try:
