@@ -92,7 +92,7 @@ class Handler(BaseHTTPRequestHandler):
                 chunks, total = [], 0
                 while True:
                     header = self.rfile.readline(96)
-                    if not header.endswith(b"\\r\\n") or not header:
+                    if not header.endswith(b"\r\n") or not header:
                         raise ValueError("bad chunk framing")
                     # Reject extensions to prevent request-smuggling ambiguity.
                     sizeword = header[:-2]
@@ -102,11 +102,11 @@ class Handler(BaseHTTPRequestHandler):
                     if size > MAX_BODY - total:
                         raise ValueError("IPP document too large")
                     if size == 0:
-                        if self.rfile.read(2) != b"\\r\\n":
+                        if self.rfile.read(2) != b"\r\n":
                             raise ValueError("unsupported HTTP trailers")
                         break
                     part = self.rfile.read(size)
-                    if len(part) != size or self.rfile.read(2) != b"\\r\\n":
+                    if len(part) != size or self.rfile.read(2) != b"\r\n":
                         raise ValueError("short HTTP chunk")
                     chunks.append(part)
                     total += size
