@@ -21,7 +21,7 @@ class FailureInjection(unittest.TestCase):
             capture = root / "capture"; capture.mkdir(mode=0o700)
             pdf = root / "job.pdf"; make_pdf(pdf, 2)
             env = os.environ.copy(); env["GW_TEST_FAIL_AFTER_BYTES"] = "20"
-            proc = subprocess.Popen([str(ROOT / "build/gateway-test"), "--port", str(port), "--capture-dir", str(capture)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            proc = subprocess.Popen(["python3", str(ROOT / "scripts/strict_ipp_proxy.py"), "--testing", "--port", str(port), "--capture-dir", str(capture)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 wait_for(lambda: subprocess.run(["ipptool", "-t", f"ipp://127.0.0.1:{port}/ipp/print", "/usr/share/cups/ipptool/get-printer-attributes.test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
                 result = submit(port, pdf, "application/pdf")
