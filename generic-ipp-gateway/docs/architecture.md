@@ -1,23 +1,21 @@
-# Architecture
+# Architecture (capture-only)
 
 ```mermaid
 flowchart LR
-  Client[IPP client] -->|loopback HTTP/IPP| PAPPL[PAPPL 1.3 IPP service]
-  PAPPL -->|application/pdf| PDF[pdftoppm PDF filter]
-  PAPPL -->|image/pwg-raster| RASTER[PAPPL built-in PWG streaming path]
-  PDF -->|512-dot 1-bit rows| CB[Job raster callbacks]
-  RASTER -->|1-bit rows, 512-dot center crop| CB
-  CB -->|per-job mutex| ESC[ESC/POS encoder]
-  ESC -->|local file only| CAP[0600 .partial then atomic .escpos]
-  ESC -->|successful job only| CUT[one GS V 0 event]
+  IPP["IPP Client (loopback)"] --> PRE["Strict IPP/HTTP media gate :8631"]
+  PRE -->|"PDF"| PAPPL["PAPPL :8632"]
+  PRE -->|"Original PWG"| CONV["cupsRaster decode → exact-size PDF"]
+  CONV --> PAPPL
+  PAPPL --> FILTER["Poppler PDF → 512dot 1bit rows"]
+  FILTER --> LOCK["Whole-job mutex → ESC/POS raster"]
+  LOCK --> CAP["0600 partial → fsync → atomic complete capture"]
+  LOCK --> CUT["Single terminal GS V 0 on success"]
 ```
 
-The custom PAPPL device scheme is exactly `capture://local`. Its open callback accepts only that URI, its close callback is a no-op, and its device-write callback always returns `-1`. The print callbacks write through `capture.c` using an `openat` directory descriptor; they do not call `papplDeviceWrite`.
+The strict front end validates original IPP `media` and nested `media-col` before PAPPL can normalize unsupported media, rejects unsupported state-changing operations, accepts bounded HTTP chunked/Content-Length framing, and forwards through **127.0.0.1 only**. Backend PAPPL is on a different loopback port. The raw backend is a trusted local implementation detail, **not protected from other local processes**.
 
-The PDF filter invokes `/usr/bin/pdftoppm` with an argv array (no shell), a 30-second CPU limit, a 768 MiB address-space limit, a 64 MiB per-file size limit, at most 201 output pages for detection, and 512-dot output width. It reads one PGM row at a time and packs it to one-bit black pixels. Full Poppler sandboxing is not provided.
+PAPPL 1.3 streams PWG directly and normalizes page height to the default 200mm media. Thus a driver callback cannot re-open the original PWG job file. Instead the front end decodes the source PWG with CUPS raster APIs and writes a multi-page PDF containing an image per page with original height in the MediaBox; the existing Poppler-driven PDF filter rasterizes that. Source white rows remain intact. Constraints: 512 dots, 1bit K/W, <=65535 rows/page, <=200 pages, <=64MiB processed raster per conversion. Unsupported or truncated conversion fails without a completed capture.
 
-PAPPL's special PWG Raster streaming path does not call the registered MIME filter. It calls the raster driver callbacks directly. The driver emits 512 dots by center cropping the callback row. PAPPL's output header uses the queue's 200 mm media length, so the PWG path can add blank rows per page. It remains useful for protocol/capture testing, but it is not yet suitable for continuous-document output.
+Page callbacks write image rows and **do not feed or cut at page boundaries**. The job finalizer alone writes one full-cut command into the capture on success. The capture directory is absolute, user-owned, private and not a symlink; completed files are mode 0600. There is no TCP/9100/USB/serial/remote printer code.
 
-An exclusive mutex protects a whole capture job. The encoder emits one `GS v 0` raster header per page and emits no page feed or cut command. The job end callback appends one full-cut `GS V 0` only if all callbacks succeeded and at least one page completed. `capture_finish` fsyncs, renames the temporary file, then writes a structured event. Failures remove partial data and do not produce a completed event.
-
-The capture directory is required to be absolute, owned by the effective user, a real directory (not a symlink), and have no group/world permissions. A 64 MiB ESC/POS job limit is enforced. A process restart never promotes `.partial` files.
+The front end does not yet support Create-Job/Send-Document transactions, Windows/Mopria discovery, TLS, LAN clients, or host-based isolation of the backend port. Security and client interoperability must be resolved before any non-offline rollout.
