@@ -60,7 +60,7 @@ start_job(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device)
   if (!gw_capture_begin(papplJobGetID(job))) goto fail;
   const char *format = papplJobGetFormat(job);
   if (format && !strcmp(format, "image/pwg-raster")) {
-    if (!gw_pwg_render_original(job)) goto fail_capture;
+    if (!gw_pwg_render_original(job)) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "Original PWG raster parsing failed"); goto fail_capture; }
     native_pwg = true; /* Discard PAPPL's padded rendition in callbacks. */
   }
   return true;
