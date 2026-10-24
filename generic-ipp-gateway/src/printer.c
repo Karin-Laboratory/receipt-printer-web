@@ -5,6 +5,7 @@
 static const char *media_names[] = { "custom_receipt_80x200mm" };
 
 static _Thread_local bool owns_job_lock;
+static _Thread_local bool native_pwg;
 
 static bool
 valid_media(pappl_job_t *job)
@@ -36,6 +37,7 @@ void
 gw_abort_current_job(pappl_job_t *job)
 {
   if (owns_job_lock) {
+    native_pwg = false;
     gw_capture_finish(false);
     owns_job_lock = false;
     pthread_mutex_unlock(&gw_job_mutex);
@@ -54,9 +56,18 @@ start_job(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device)
   }
   pthread_mutex_lock(&gw_job_mutex);
   owns_job_lock = true;
+  native_pwg = false;
   if (!gw_capture_begin(papplJobGetID(job))) goto fail;
+  const char *format = papplJobGetFormat(job);
+  if (format && !strcmp(format, "image/pwg-raster")) {
+    if (!gw_pwg_render_original(job)) goto fail_capture;
+    native_pwg = true; /* Discard PAPPL's padded rendition in callbacks. */
+  }
   return true;
+fail_capture:
+  gw_capture_finish(false);
 fail:
+  native_pwg = false;
   owns_job_lock = false;
   pthread_mutex_unlock(&gw_job_mutex);
   papplJobSetReasons(job, PAPPL_JREASON_ERRORS_DETECTED, 0);
@@ -69,6 +80,7 @@ start_page(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device
   (void)device;
   (void)job;
   (void)page;
+  if (native_pwg) return owns_job_lock;
   return owns_job_lock && gw_escpos_page_begin(GW_WIDTH_DOTS,
                                                (unsigned)options->header.cupsHeight);
 }
@@ -78,6 +90,7 @@ write_line(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device
            unsigned y, const unsigned char *line)
 {
   (void)job; (void)device;
+  if (native_pwg) return owns_job_lock;
   if (!owns_job_lock || options->header.cupsBitsPerPixel != 1 || options->header.cupsWidth < GW_WIDTH_DOTS || options->header.cupsWidth > 600)
     return false;
   return gw_escpos_row(line, (unsigned)options->header.cupsWidth, y);
@@ -87,6 +100,7 @@ static bool
 end_page(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device, unsigned page)
 {
   (void)job; (void)options; (void)device; (void)page;
+  if (native_pwg) return owns_job_lock;
   return owns_job_lock && gw_escpos_page_end();
 }
 
@@ -101,6 +115,7 @@ end_job(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device)
   else
     gw_capture_finish(false);
   owns_job_lock = false;
+  native_pwg = false;
   pthread_mutex_unlock(&gw_job_mutex);
   if (!success) papplJobSetReasons(job, PAPPL_JREASON_ERRORS_DETECTED, 0);
   return success;
