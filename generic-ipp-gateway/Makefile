@@ -6,10 +6,10 @@ CPPFLAGS += -Iinclude $(shell $(PKG_CONFIG) --cflags pappl)
 CFLAGS ?= -O2 -g
 CFLAGS += -std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow
 LDLIBS += $(shell $(PKG_CONFIG) --libs pappl) -pthread
-SOURCES := $(wildcard src/*.c)
+SOURCES := $(filter-out src/pwg2pdf.c,$(wildcard src/*.c))
 
 .PHONY: all clean test check-deps analyze check-capture-only
-all: $(BUILD)/gateway
+all: $(BUILD)/gateway $(BUILD)/pwg2pdf
 
 check-deps:
 	@$(PKG_CONFIG) --exists pappl || (echo "Install libpappl-dev" >&2; exit 1)
@@ -21,6 +21,9 @@ $(BUILD):
 
 $(BUILD)/gateway: $(SOURCES) include/gateway.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(SOURCES) -o $@ $(LDFLAGS) $(LDLIBS)
+
+$(BUILD)/pwg2pdf: src/pwg2pdf.c | $(BUILD)
+	$(CC) $(CFLAGS) $< -o $@ -lcups -lz
 
 $(BUILD)/gateway-test: $(SOURCES) include/gateway.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DGW_TESTING $(SOURCES) -o $@ $(LDFLAGS) $(LDLIBS)
