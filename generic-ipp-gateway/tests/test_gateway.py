@@ -136,6 +136,23 @@ class GatewayIntegration(unittest.TestCase):
             x = 27 + i
             self.assertTrue(page[x // 8] & (0x80 >> (x % 8)), f"missing original PWG marker on page {i}")
 
+    def test_pwg_variable_heights_preserve_intentional_blank_rows(self):
+        for rows in (1, 7, 19):
+            source = self.root / f"vary-{rows}.pwg"
+            subprocess.run([str(ROOT / "build/raster-fixture"), str(source), "2", str(rows)], check=True)
+            before = set(self.capture.glob("job-*.escpos"))
+            result = submit(self.port, source, "image/pwg-raster")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            wait_for(lambda: len(set(self.capture.glob("job-*.escpos")) - before) >= 1)
+            data = (set(self.capture.glob("job-*.escpos")) - before).pop().read_bytes()
+            pages, cuts = parse_escpos(data)
+            self.assertEqual((len(pages), cuts), (2, 1))
+            self.assertEqual([len(page) for page in pages], [64 * rows, 64 * rows])
+            # Source row 0 is non-white; remaining blank rows must be retained.
+            self.assertTrue(all(any(page[:64]) for page in pages))
+            if rows > 2:
+                self.assertTrue(all(not any(page[128:]) for page in pages))
+
     def test_pdf_single_two_ten_page_documents(self):
         for count in (1, 2, 10):
             path = self.root / f"{count}.pdf"
