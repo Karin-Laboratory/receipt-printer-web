@@ -6,6 +6,7 @@
 *.p12
 *.pfx
 *.log
+*.o
 *.sqlite
 *.sqlite3
 __pycache__/

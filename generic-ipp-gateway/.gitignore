@@ -1,0 +1,5 @@
+/build/
+/capture/
+*.escpos
+*.partial
+__pycache__/

@@ -1,0 +1,15 @@
+{
+	NAME "Reject non-roll A4 media"
+	OPERATION Print-Job
+	GROUP operation-attributes-tag
+	ATTR charset attributes-charset utf-8
+	ATTR language attributes-natural-language en
+	ATTR uri printer-uri $uri
+	ATTR name requesting-user-name $user
+	ATTR mimeMediaType document-format $filetype
+	ATTR boolean ipp-attribute-fidelity true
+	GROUP job-attributes-tag
+	ATTR keyword media iso_a4_210x297mm
+	FILE $filename
+	STATUS client-error-attributes-or-values-not-supported
+}
