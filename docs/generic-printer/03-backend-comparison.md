@@ -14,7 +14,7 @@ IPPはクライアントとserver間のjob/attributes/status protocol、ESC/POS�
 | B. CUPS + raster-to-ESC/POS filter | PDF/PWG Rasterを1-bit rasterにし既存ESC/POSに接続可能。custom filterの保守が必要 | CUPS queueがIPP attributes/形式を適切に公開すれば候補 | page毎のcut命令を排除し文書終端だけcut、可変長page stitch、異常終了時cut抑止が核心 |
 | C. CUPS IPP受信 + 既存receipt-web renderer | Pillow/QR/日本語描画を活用できる。ローカルIPP submission adapter/filterの追加が必要 | CUPS front-end経由でOS standardを狙える | 現rendererはWeb request context、複数width固定値、直接RAW送信に依存。PDF任意page/文書stitchへ分離が必要 |
 | D. 独立IPP server + ESC/POS | 属性・発見・job lifecycleを最大限制御するが実装保守負荷が高い | 仕様準拠ならWindows/Android双方 | IPP/認証/証明書/queue/statusまで独自保守する必要 |
-| E. PAPPL Printer Application + ESC/POS filter | **推奨候補**。IPP Everywhere/DNS-SDの既製frameworkを使いnative driver callback/filterを追加 | Driverless clientを狙える | PAPPLはTM-T88V driverではない。80mm job layout/連続feed/cut/失敗制御を独自検証 |
+| E. PAPPL Printer Application + ESC/POS filter | **推奨**。IPP Everywhere/DNS-SDとrstartjob/rendjob callbackを使い、job単位のterminal cutを一箇所で所有できる | Driverless clientを狙える | PAPPLはTM-T88V driverではない。80mm job layout/連続feed/cut/失敗制御を独自検証 |
 
 CUPSの古典PPD/driverは非推奨で、OpenPrintingはIPP Everywhere/Printer Applicationを推奨する。[CUPS driver guidance](https://openprinting.github.io/cups/drivers.html) CUPSの`socket` backendはRAW送信transportであり、文書変換機能ではない。[CUPS admin](https://openprinting.github.io/cups/doc/admin.html)
 
@@ -45,4 +45,4 @@ Debian 13でCUPS、Avahi、PDF/raster toolsを利用する構成は想定可能�
 
 ## 評価
 
-Eを第一候補とし、Phase 0/PoCでCUPS custom filterとの構成差を確認する。BのfilterまたはCの既存renderer reuseは、IPP front-endを実機clientで確認した上で使う。Job lifecycleが「1文書1spool job・全page連結・terminal cut一回・partial-send uncertain」で満たせなければ本番採用しない。
+**Eを第一候補として確定**する。PAPPLのrstartjob/rwriteline/rendjob modelがdocument job境界で終端処理を1箇所へ置ける。PDF受信はcups-filtersの変換器を利用し、PWG RasterをPAPPLへ渡す。CUPS custom filterはcapture-only隔離PoCに限って比較し、client compat/PPD attributes/job end/cut injectionを確認する。既存renderer reuseはWeb経路のadapterとして用い、OS document rendererの代替にしない。Job lifecycleが「1文書1spool job・全page連結・terminal cut一回・partial-send uncertain」で満たせなければ本番採用しない。

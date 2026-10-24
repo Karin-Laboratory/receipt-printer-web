@@ -51,7 +51,7 @@ IPPの一般形式にはPDF/PWG Raster等がある。[OpenPrinting driverless](h
 - mDNS/DNS-SDは通常同一リンク内。VLAN/subnet/VPNでは自動発見しない前提で、reflectorか手動登録を検討する。
 - IPPSはTLS/証明書を含む。媒体幅やcut仕様はIPP attributes/filterで別途実装。
 - IPP queueのmedia capabilitiesは80mm rollだけを提供し、A4/58mmは公開しない。
-- Epson TM-T88V資料上の80mm印字幅は72mm/512 dots。[Epson guide](https://files.support.epson.com/pdf/pos/bulk/tm-t88v_trg_en_revf.pdf) 実機のfirmware/interface、紙送り/カット仕様と不揮発設定は未確認。
+- Epson TM-T88V資料上の80mm印字幅は72mm/512 dots。[Epson guide](https://download4.epson.biz/sec_pubs/bs/pdf/TM-T88V_trg_en_revG.pdf) 実機のfirmware/interface、紙送り/カット仕様と不揮発設定は未確認。
 - 日本語はサーバ側でフォント描画してraster化する設計がコードページ差を減らす。フォントlicense、縮小率、画像/QR再現性をPhase 3で検証する。
 
 ## 結論

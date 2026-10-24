@@ -4,7 +4,7 @@
 
 | Phase | 作業・条件 | 確認項目 / 成功判定 | ロールバック |
 |---|---|---|---|
-| 0. 監査/バックアップ設計 | 実装前に型番suffix/firmware/interface、media設定、CT制限、network ACLをread-only確認。app/unit/SQLite/config/filter/queue/firewallのbackup/restore手順作成。CUPSとPAPPL PoCを隔離環境で比較 | 80mm native width、feed/cut command、full/partial cut仕様、single terminal cut、正常終了境界、uncertain job手順が確定。復元手順をレビュー | 本番に触れない。隔離PoCを破棄 |
+| 0. 監査/バックアップ設計 | 実装前に型番suffix/firmware/interface、media設定、CT制限、network ACLをread-only確認。app/unit/SQLite/config/filter/queue/firewallのbackup/restore手順作成。PAPPLを第一候補として設計確定。CUPS custom filterはcapture-only隔離環境で比較 | 80mm native width、feed/cut command、full/partial cut仕様、single terminal cut、正常終了境界、uncertain job手順が確定。復元手順をレビュー | 本番に触れない。隔離PoCを破棄 |
 | 1. Windows test page | Phase 0、backup、限定LAN/保守時間、test queue作成が揃う | Win10 21H2+/Win11からmanual IPP add、通常dialog印刷、IPP attributesは80mmだけ、A4/58mmなし。単一ページは正常終了時1回cut。複数job混在なし | test queue/IPP port/advertisement停止。旧Web経路維持 |
 | 2. Android標準印刷 | Phase 1成功後、Mopriaまたは標準Print Serviceを使用 | mDNS discovery、手動IP fallback、Chrome/PDF viewer print UI、80mm設定、1文書1cut。mDNS不通でもmanual setup可 | Avahi/IPP test queue停止。client serviceを無効化 |
 | 3. 日本語/画像/PDF品質 | Phase 1/2後、safe test contentと保守枠 | CJK glyph/line wrap, image levels, QR scan, PDF scaling/orientation, multi-page continuous roll, no page cuts, end feed/cut position。font license確認 | filter/media configを前版へ戻しtest jobs削除 |
@@ -23,4 +23,4 @@
 
 ## Phase 1 判定
 
-**現在はNO-GO**。今回が調査のみであることに加え、完全な型番/firmware、paper configuration、印刷成功ACK/エラー境界、80mm feed/cutの実機基準が未確定。次回、Phase 0のバックアップ/rollback、限定保守枠、隔離IPP queue、Windows test client、テスト用紙が揃えば、既存Web経路を保持したままPhase 1へGO判定できる。
+**隔離ソフトウェア実装はGO、実機出力を含むPhase 1はNO-GO**。PAPPL + PDF-to-PWG Raster + ESC/POS filterのcapture-only環境をagent開発ホストの別VM/containerに構築し、物理プリンタへのegressを遮断した状態なら既存サービスを保ったままWindows/Android clientとIPP job/filter出力を検証できる。実機の完全な型番/firmware、paper configuration、印刷成功ACK/エラー境界、feed/cut基準は未確定であり、printer portへ接続するPhase 1は現時点で開始しない。物理試験にはPhase 0のバックアップ、exclusive maintenance windowまたは別プリンタ、Windows test client、テスト用紙、明示GOが必要。

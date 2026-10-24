@@ -2,15 +2,13 @@
 
 ## 推奨方式: 単一IPP queueとESC/POS出力worker
 
-Debian 13上のIPP Everywhere front-endと単一spool/job schedulerを配置する。CUPS custom queueまたはPAPPL Printer ApplicationをPhase 0の隔離PoCで選ぶ。IPPはPDF/PWG Rasterを受け、server filterが80mm roll用幅へnormalizeし、同じ文書の全ページをcutなしで連続送信する。成功した最終データの後にauto-cutを一度だけ送る。既存Web/quick-print/phone eventも同じqueueへlocal submitし、プリンタへの直接9100接続をなくす。
+Debian 13上のIPP Everywhere front-endと単一spool/job schedulerを配置する。PAPPL Printer Applicationをfront-end/job lifecycleに採用し、既存cups-filtersをPDF→PWG Raster入力変換に使う方式を第一選定とする。CUPS custom filterは比較対象として隔離capture環境で評価する。IPPはPDF/PWG Rasterを受け、server filterが80mm roll用幅へnormalizeし、同じ文書の全ページをcutなしで連続送信する。成功した最終データの後にauto-cutを一度だけ送る。既存Web/quick-print/phone eventも同じqueueへlocal submitし、プリンタへの直接9100接続をなくす。
 
 ```mermaid
 flowchart LR
   subgraph Clients
-    W[Windows 10/11
-IPP Class Driver]
-    A[Android
-Mopria / Print Service]
+    W[Windows 10/11<br/>IPP Class Driver]
+    A[Android<br/>Mopria / Print Service]
     B[Existing Web / quick-print]
     P[Phone event app]
   end
@@ -18,15 +16,10 @@ Mopria / Print Service]
   A -->|IPP PDF / PWG Raster| Q
   B -->|local submit| WEB
   P -->|authenticated event API| WEB
-  WEB[receipt-web
-render / QR / phone event] -->|same queue submit| Q
-  Q[IPP Everywhere front-end
-CUPS queue or PAPPL app] --> S[spool + exclusive scheduler
-1 document = 1 job]
-  S --> F[PDF pages to raster
-80mm layout, no page cuts]
-  F --> E[ESC/POS stream
-exactly one terminal auto-cut]
+  WEB[receipt-web<br/>render / QR / phone event] -->|same queue submit| Q
+  Q[IPP Everywhere front-end<br/>PAPPL Printer Application] --> S[spool + exclusive scheduler<br/>1 document = 1 job]
+  S --> F[PDF pages to raster<br/>80mm layout, no page cuts]
+  F --> E[ESC/POS stream<br/>exactly one terminal auto-cut]
   E -->|server-only RAW TCP 9100| T[TM-T88V family]
 ```
 
@@ -50,18 +43,18 @@ exactly one terminal auto-cut]
 
 ## 代替
 
-1. **CUPS custom filter**: 実装を小さく始めやすい。IPP clientからのformat/capability表示と共有発見を重点実証する。
-2. **PAPPL native Printer Application**: IPP属性・discovery制御をしやすいがfilter/job lifecycleを実装する。
+1. **CUPS custom filter**: CUPS spool/filter chainが成熟しておりPDF変換を統合しやすい。driverless shared queueのcapabilityとjob終端callbackをどう実現するかを実証する。
+2. **PAPPL native Printer Application**: IPP attributes/discoveryとrstartjob/rendjob lifecycleが明確。PWG Raster受け入れまでとESC/POS encoder/filterは実装する必要がある。
 3. **Epson APD on Windows**: Windowsのみのfallback。APDでは文書終端一回cutを含む連続roll動作を実証する。
 4. **専用Android PrintService**: Mopria interop不成立時の追加開発。標準IPP経路より端末ごとのAPK管理が増える。
 
 ## 導入候補（今回未導入）
 
-- Debian CUPS daemon/client、filter tools
+- PAPPL + `cups-filters` / PDF-to-PWG Raster component (standalone CUPS daemon is optional in chosen design)
 - Avahi daemon / DNS-SD
 - PDF rendererおよびPWG Raster decoder
 - 80mm layout + raster-to-ESC/POS filter/encoder（既製の保守済み適合実装を特定できていない）
-- PAPPL + native applicationを選んだ場合は開発依存
+- PAPPL native application build/runtime dependencies
 - Web appから同じqueueへ送るローカルIPPs/IPP clientまたは専用adapter
 
 ## Network / security
@@ -75,7 +68,7 @@ exactly one terminal auto-cut]
 
 ## 検証課題
 
-- Epson資料の通常TM-T88V 80mm印字可能幅72mm/512 dots。[Epson guide](https://files.support.epson.com/pdf/pos/bulk/tm-t88v_trg_en_revf.pdf) 完全なsuffix/firmware/interfaceと実media設定を確認。
+- Epson資料の通常TM-T88V 80mm印字可能幅72mm/512 dots。[Epson guide](https://download4.epson.biz/sec_pubs/bs/pdf/TM-T88V_trg_en_revG.pdf) 完全なsuffix/firmware/interfaceと実media設定を確認。
 - 80mm mediaだけを広告しA4/58mmを拒否する。
 - native width/scale/margins、PDF page resizeと連結、orientation、large job memory、font license、Japanese glyph、image tone、QR integrity。
 - feed amountとfull/partial cutの仕様を正確なmodel guideで確認。最終feed/cut locationを実測。
