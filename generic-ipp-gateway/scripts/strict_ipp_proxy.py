@@ -9,6 +9,7 @@ import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import http.client
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -168,6 +169,10 @@ def main():
         p.error("build gateway and pwg2pdf first")
     # No external binding or printer transport, even via configuration.
     backend_port = args.port + 1
+    def stop_cleanly(_signum, _frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop_cleanly)
     proc = subprocess.Popen([str(binary), "--port", str(backend_port),
                              "--capture-dir", args.capture_dir],
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -177,6 +182,8 @@ def main():
             server.backend_port = backend_port
             server.converter = converter
             server.serve_forever(poll_interval=.1)
+    except KeyboardInterrupt:
+        pass
     finally:
         proc.terminate()
         try:
