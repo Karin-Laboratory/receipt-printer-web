@@ -22,25 +22,25 @@ gw_pwg_render_original(pappl_job_t *job)
   int fd = -1;
   unsigned pages = 0;
   bool ok = false;
-  if (!path || !*path) return false;
+  if (!path || !*path) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "PWG original filename unavailable"); return false; }
   fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-  if (fd < 0) return false;
+  if (fd < 0) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "PWG original open failed"); return false; }
   raster = cupsRasterOpen(fd, CUPS_RASTER_READ);
-  if (!raster) goto done;
+  if (!raster) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "PWG original cupsRasterOpen failed"); goto done; }
   while (cupsRasterReadHeader2(raster, &h)) {
+    papplLogJob(job, PAPPL_LOGLEVEL_INFO, "PWG original header: width=%u height=%u bpp=%u colorspace=%u order=%u bytesline=%u", h.cupsWidth, h.cupsHeight, h.cupsBitsPerPixel, (unsigned)h.cupsColorSpace, (unsigned)h.cupsColorOrder, h.cupsBytesPerLine);
     if (++pages > 200 || h.cupsHeight == 0 || h.cupsHeight > 65535u ||
         h.cupsWidth < GW_WIDTH_DOTS || h.cupsWidth > 600 ||
         h.cupsBitsPerPixel != 1 || h.cupsBitsPerColor != 1 ||
         h.cupsColorOrder != CUPS_ORDER_CHUNKED ||
         (h.cupsColorSpace != CUPS_CSPACE_K && h.cupsColorSpace != CUPS_CSPACE_W) ||
         h.cupsBytesPerLine < (h.cupsWidth + 7u) / 8u ||
-        h.cupsBytesPerLine > 1024) goto done;
+        h.cupsBytesPerLine > 1024) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "PWG header unsupported"); goto done; }
     row = malloc(h.cupsBytesPerLine);
     if (!row) goto done;
     if (!gw_escpos_page_begin(GW_WIDTH_DOTS, h.cupsHeight)) goto done;
     for (unsigned y = 0; y < h.cupsHeight; y++) {
-      if (cupsRasterReadPixels(raster, row, h.cupsBytesPerLine) != h.cupsBytesPerLine)
-        goto done;
+      if (cupsRasterReadPixels(raster, row, h.cupsBytesPerLine) != h.cupsBytesPerLine) { papplLogJob(job, PAPPL_LOGLEVEL_ERROR, "PWG truncated at row %u", y); goto done; }
       if (h.cupsColorSpace == CUPS_CSPACE_W) {
         for (unsigned j = 0; j < h.cupsBytesPerLine; j++) row[j] = (unsigned char)~row[j];
       }
