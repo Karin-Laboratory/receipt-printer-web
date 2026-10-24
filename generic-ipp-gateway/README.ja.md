@@ -37,3 +37,11 @@ captureディレクトリは絶対パス、実行ユーザー所有、mode `0700
 [英語README](README.md)、[構成](docs/architecture.md)、[IPP互換性](docs/ipp-compatibility.md)、[安全境界](docs/safety.md)、[テスト結果](docs/test-results.md)を参照してください。
 
 Phase 0の設計資料は[Draft PR #1](https://github.com/Karin-Laboratory/receipt-printer-web/pull/1)にあります。本実装は別ブランチ・別PRで提出します。
+
+## 開発中：IPP媒体の受付前検証
+
+`scripts/media_guard.py` に、PAPPLによる媒体置換より前の元IPP属性を解析する **単独のオフライン検証器** を追加した。80mm指定だけを許可し、A4、58mm、媒体未指定、未検証の `media-col` を安全側に拒否する。`tests/test_media_guard.py` に6件の回帰試験がある。
+
+**現時点ではIPP HTTP受付と接続していない。** PAPPLが直接受ける既存の `127.0.0.1` queueは依然としてA4を置換し得る。このコードの追加をもって厳密拒否の完了とは判定しない。接続時にはIPP binary framing、HTTP message長、streaming、Print-Job/Create-Job/Send-Document、未知のmedia-col、Mopria互換性を検証する必要がある。
+
+PWG Rasterの200mm固定長問題も未解決。ページ尾部の単純な白行削除は意図した余白を消すため採用しない。既存のcapture-only制約、CT363と実機への接続NO-GOを維持する。
