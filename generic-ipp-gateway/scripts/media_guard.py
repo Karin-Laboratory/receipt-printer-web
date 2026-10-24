@@ -130,8 +130,6 @@ def admit_job_media(attrs: list[Attribute]):
     if media and (media[0].tag not in (0x42, 0x44) or media[0].data != ALLOWED_MEDIA):
         return False
     starts = [i for i, a in enumerate(job) if a.name == "media-col" and a.tag == 0x34]
-    if len(starts) > 1:
-        return False
     if starts:
         good, end = _check_collection(job, starts[0])
         if not good:
