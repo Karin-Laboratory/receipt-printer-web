@@ -1,45 +1,29 @@
-# Capture-only 80 mm IPP receipt gateway
+# Capture-only 80mm IPP receipt gateway
 
-This is an isolated prototype for accepting IPP print jobs and converting them to 512-dot ESC/POS byte streams. It is deliberately capture-only: it has no printer address setting, RAW TCP/9100 transport, USB/serial transport, or usable device-write callback. Successful jobs are saved as local `.escpos` files. **Building or running this program cannot print to a physical printer.**
-
-The project uses PAPPL 1.3.x, libcups raster support, and Poppler's `pdftoppm`. The IPP listener binds to `127.0.0.1` by default. The printer queue is `80mm-capture`; the test endpoint is `/ipp/print`.
+Offline development prototype for IPP `Print-Job` submission, PDF/PWG Raster conversion, and 512-dot ESC/POS capture. **There is no physical printer transport, raw TCP 9100 sender, USB output, or CT363 deployment.**
 
 ## Build and test on Debian 13
 
-Install development and test dependencies:
-
 ```sh
-sudo apt-get install build-essential pkg-config libpappl-dev poppler-utils cups-ipp-utils python3-pil python3-qrcode fonts-unifont
+sudo apt-get install build-essential pkg-config libpappl-dev zlib1g-dev poppler-utils cups-ipp-utils python3-pil python3-qrcode fonts-unifont
 make
 make test
-make analyze
-make check-capture-only
+make analyze check-capture-only
 ```
 
-Start a local capture-only IPP service:
+## Run through the strict IPP admission front end
 
 ```sh
 install -d -m 700 "$PWD/capture"
-./build/gateway --port 8631 --capture-dir "$PWD/capture"
+python3 scripts/strict_ipp_proxy.py --port 8631 --capture-dir "$PWD/capture"
 ```
 
-Use an absolute capture path owned by the current user with mode `0700`. The default listener is loopback, so Windows and Android devices cannot connect to it. A later deployment phase must explicitly design LAN ingress, firewalling, authentication, service discovery, and TLS before changing that boundary.
+The admission listener is bound to `127.0.0.1:8631`; an internal PAPPL listener uses `127.0.0.1:8632`. Always use the front end. Running `build/gateway` directly bypasses media validation because PAPPL 1.3 substitutes unsupported paper sizes. **Both endpoints are loopback-only, not a security boundary against other processes on the same host**. Do not deploy to shared hosts or expose externally.
 
-Each completed job becomes `job-N.escpos`; `events.jsonl` records job ID, page count, final-cut count, and byte count. Files are mode `0600`. Failed jobs do not publish an `.escpos` file. A `.partial` file is never replayed automatically.
+Output consists of private `job-N.escpos` captures and `events.jsonl`. Complete documents have a single terminal `GS V 0` cut command. Partial captures are discarded and never automatically replayed.
 
-## Current support
+The front end accepts PDF and **512-dot, monochrome PWG Raster (K/W)** Print-Job submissions. Original PWG rows are decoded into an exact-page-height PDF before PAPPL, avoiding the framework's fixed 200mm page padding. This preserves legitimate white rows, rather than trimming them heuristically. PDF conversion uses Poppler. Explicit A4/58mm or inconsistent media-col dimensions are rejected at IPP ingress. Missing media attributes use the queue's 80mm default. Chunked and Content-Length HTTP requests are supported under a bounded body limit.
 
-- PDF is rasterized using `/usr/bin/pdftoppm`, scaled to 512 dots, and rendered as 180 dpi monochrome data.
-- PAPPL's built-in PWG Raster path is accepted and captured at 512 output dots. PAPPL 1.3 uses its fixed 200 mm media length for this streaming path, so it may pad each source page with blank rows. Variable page length for PWG Raster is not complete.
-- Page callbacks never emit a cut. Only a successful end-of-job callback appends one `GS V 0` full-cut command.
-- The PDF path has tested one, two, and ten pages; long pages; QR and Japanese glyph *images*; multiple simultaneous submissions; malformed input; and injected capture failure.
-- Windows 10/11 and Android/Mopria clients have not been tested. IPP protocol tests use `ipptool` over loopback only.
-- Strict rejection of an unsupported `media` value is a known gap: PAPPL 1.3.1 reports `successful-ok-ignored-or-substituted-attributes` for an A4 request, even with `ipp-attribute-fidelity=true`. The gateway cannot recover the discarded original value from the resulting job callback. Do not use this prototype for clients that must be refused by media size.
+**Limitations:** Create-Job/Send-Document are not supported by the strict front end; Windows and Android/Mopria client compatibility has not been tested. No DNS-SD/LAN/TLS/authentication. Maximum ~64MiB per job, 200 pages, and 65535 raster rows/page. Client-originated PWG that is *already* padded to 200mm cannot be unambiguously shortened. Physical feed/cutter settings and printer finish acknowledgments are unknown. Production and physical tests remain NO-GO.
 
-See [Japanese instructions](README.ja.md), [architecture](docs/architecture.md), [IPP compatibility](docs/ipp-compatibility.md), [safety boundary](docs/safety.md), and [test results](docs/test-results.md).
-
-Phase 0 investigation/design remains in [Draft PR #1](https://github.com/Karin-Laboratory/receipt-printer-web/pull/1). This implementation is a separate branch and PR.
-
-## License
-
-The gateway code follows the repository's MIT license. Third-party dependency notes are in [LICENSE-NOTES.md](LICENSE-NOTES.md).
+See [Japanese README](README.ja.md), [architecture](docs/architecture.md), [safety](docs/safety.md), [test results](docs/test-results.md), and [license notes](LICENSE-NOTES.md). [Phase 0 Draft PR #1](https://github.com/Karin-Laboratory/receipt-printer-web/pull/1) is separate from implementation Draft PR #2.
