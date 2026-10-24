@@ -90,9 +90,12 @@ def _check_collection(attrs: list[Attribute], start: int):
                 return False, i
             stack.pop()
             if not stack:
-                good_size = dimensions.get("x-dimension") == 8000 and dimensions.get("y-dimension", 0) > 0
-                good_name = name == ALLOWED_MEDIA
-                return (good_size or good_name) and (name is None or name == ALLOWED_MEDIA), i
+                if name is not None and name != ALLOWED_MEDIA:
+                    return False, i
+                if dimensions and (set(dimensions) != {"x-dimension", "y-dimension"} or
+                                   dimensions["x-dimension"] != 8000 or dimensions["y-dimension"] <= 0):
+                    return False, i
+                return (name == ALLOWED_MEDIA or bool(dimensions)), i
             pending = None
         elif a.tag == 0x4a:
             if not stack or not a.data:
