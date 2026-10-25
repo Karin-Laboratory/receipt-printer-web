@@ -1,0 +1,22 @@
+name = "karin-print-staging"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# This is intentionally not a deployable production configuration.
+# Copy to wrangler.toml after creating bindings and configuring Access.
+[vars]
+ACCESS_TEAM_DOMAIN = "https://REPLACE-TEAM.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE-WITH-ACCESS-APPLICATION-AUD"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "karin-print-staging"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "karin-print-staging-private"
+
+[triggers]
+crons = ["0 * * * *"]

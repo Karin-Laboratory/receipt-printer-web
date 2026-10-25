@@ -1,0 +1,33 @@
+name: cloudflare-print-capture-only
+on:
+  push:
+    paths:
+      - "cloudflare-print/**"
+      - ".github/workflows/cloudflare-print.yml"
+  pull_request:
+    paths:
+      - "cloudflare-print/**"
+      - ".github/workflows/cloudflare-print.yml"
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Worker syntax and Node unit tests
+        working-directory: cloudflare-print
+        run: npm run verify
+      - name: Pull-agent offline tests
+        working-directory: cloudflare-print
+        run: python3 -m unittest discover -s agent/tests -p 'test_*.py' -v
+      - name: No hardware sender or credentials in cloud-print code
+        run: |
+          if grep -R -n -E 'socket\.connect|9100|papplDeviceWrite|REPLACE_WITH_REAL_SECRET' cloudflare-print/src cloudflare-print/agent/*.py; then
+            echo 'Hardware transport and inline secrets are forbidden'; exit 1
+          fi
+          git diff --check
