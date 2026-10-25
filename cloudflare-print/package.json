@@ -1,0 +1,11 @@
+{
+  "name": "karin-print-capture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check src/index.js && node --check src/security.js && node --check src/store.js && node --check src/ui.js",
+    "verify": "npm run check && npm test"
+  }
+}
