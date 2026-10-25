@@ -4,7 +4,6 @@ import { webcrypto } from 'node:crypto';
 import { verifyAccessJwt, browserIdentity, agentAuthorized } from '../src/security.js';
 import { inspectUpload, safeTitle } from '../src/store.js';
 
-globalThis.crypto = webcrypto;
 const enc=new TextEncoder();
 const b64=(buf)=>Buffer.from(buf).toString('base64url');
 async function jwtFixture() {
