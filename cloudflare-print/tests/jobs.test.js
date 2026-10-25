@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
 import { createDraft, confirmDraft, getOwnerJob, listOwnerJobs, cancelOwnerJob,
          claimNext, leasedContent, ackCapture, purgeExpired } from '../src/store.js';
-globalThis.crypto=webcrypto;
 
 class MemoryD1 {
   constructor(){this.jobs=[];}
